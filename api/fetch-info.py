@@ -1,40 +1,53 @@
-# File: api/download-mp3.py
-from flask import Flask, request, jsonify
+# File: api/fetch-info.py (Flask-less version)
+from http.server import BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+import json
 from yt_dlp import YoutubeDL
+import time
 
-app = Flask(__name__)
+# Helper function to format seconds into HH:MM:SS
+def format_duration(seconds):
+    if seconds is None:
+        return 'N/A'
+    return time.strftime('%H:%M:%S', time.gmtime(seconds))
 
-# Corrected Route: Vercel handles the /api/download-mp3 part.
-# The route inside the file should just be the root '/'.
-@app.route('/', methods=['GET'])
-def download_mp3():
-    video_id = request.args.get('videoId')
-    if not video_id:
-        return jsonify({"success": False, "error": "Missing video ID."}), 400
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        # Manually parse query parameters from the URL path
+        query_components = parse_qs(urlparse(self.path).query)
+        url = query_components.get('url', [None])[0]
 
-    url = f"https://www.youtube.com/watch?v={video_id}"
+        if not url:
+            self.send_response(400)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "error": "Missing YouTube URL."}).encode('utf-8'))
+            return
 
-    try:
-        # yt-dlp options to get the best audio-only format
-        ydl_opts = {
-            'format': 'bestaudio[ext=m4a]',
-            'quiet': True,
-        }
+        try:
+            # Use yt-dlp to extract information
+            with YoutubeDL({'quiet': True}) as ydl:
+                info_dict = ydl.extract_info(url, download=False)
+                
+                response_data = {
+                    "type": "video",
+                    "id": info_dict.get("id"),
+                    "title": info_dict.get("title"),
+                    "thumbnail": info_dict.get("thumbnail"),
+                    "duration": format_duration(info_dict.get("duration")),
+                }
+                
+                # Send a successful response
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({"success": True, "data": response_data}).encode('utf-8'))
 
-        with YoutubeDL(ydl_opts) as ydl:
-            info_dict = ydl.extract_info(url, download=False)
-            # The direct download URL is in the 'url' key of the extracted info
-            download_url = info_dict.get("url")
-
-            if not download_url:
-                raise Exception("Could not find a suitable download link.")
-
-            return jsonify({"success": True, "downloadUrl": download_url})
-
-    except Exception as e:
-        print(f"--- DETAILED DOWNLOAD ERROR --- \n{e}\n--- END ERROR ---")
-        return jsonify({"success": False, "error": f"Failed to get download link: {str(e)}"}), 500
-
-# This is the entry point for Vercel
-def handler(request, context):
-    return app(request, context)
+        except Exception as e:
+            print(f"--- DETAILED FETCH ERROR --- \n{e}\n--- END ERROR ---")
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": False, "error": f"Failed to get video info: {str(e)}"}).encode('utf-8'))
+        
+        return
