@@ -41,12 +41,16 @@ module.exports = async (req, res) => {
 
         const { videoId, title } = req.query;
 
-        if (!videoId) {
-            return res.status(400).json({ success: false, error: 'Missing video ID.' });
+        // Rigorous check for videoId
+        if (!videoId || typeof videoId !== 'string' || videoId === 'undefined') {
+            console.error(`Invalid videoId received: ${videoId}`);
+            return res.status(400).json({ success: false, error: 'Invalid or missing video ID.' });
         }
 
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+        console.log(`Attempting to stream from URL: ${videoUrl}`);
 
         // Use the direct streaming method which is more robust
         const stream = await play.stream(videoUrl, {
