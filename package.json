@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "YouTube to MP3 converter for Vercel",
   "dependencies": {
-    "play-dl": "^1.9.7"
+    "@distube/ytdl-core": "^2.1.9",
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "fluent-ffmpeg": "^2.1.2"
   }
 }
