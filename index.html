@@ -131,12 +131,8 @@
     </div>
 
     <script>
-        // --- Configuration ---
-        // Vercel hosts the backend in the /api folder relative to the frontend.
-        // No need to change this URL.
         const BACKEND_URL_BASE = '/api';
 
-        // --- Element References ---
         const youtubeUrlInput = document.getElementById('youtubeUrl');
         const fetchBtn = document.getElementById('fetchBtn');
         const loader = document.getElementById('loader');
@@ -144,22 +140,18 @@
         const videoList = document.getElementById('videoList');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
         
-        // Modal elements
         const messageModal = document.getElementById('messageModal');
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
         const closeModalBtn = document.getElementById('closeModalBtn');
         const modalContent = messageModal.querySelector('div');
 
-        // --- Event Listeners ---
         fetchBtn.addEventListener('click', handleFetchClick);
         closeModalBtn.addEventListener('click', closeModal);
         messageModal.addEventListener('click', (e) => {
             if (e.target === messageModal) closeModal();
         });
         downloadAllBtn.disabled = true;
-
-        // --- Core Functions ---
 
         async function handleFetchClick() {
             const url = youtubeUrlInput.value.trim();
@@ -198,15 +190,7 @@
         }
 
         function displayResults(data) {
-            if (data.type === 'playlist') {
-                data.videos.forEach(video => {
-                    videoList.innerHTML += createVideoItemHTML(video);
-                });
-                downloadAllBtn.classList.remove('hidden');
-            } else {
-                videoList.innerHTML += createVideoItemHTML(data);
-                downloadAllBtn.classList.add('hidden');
-            }
+            videoList.innerHTML = createVideoItemHTML(data);
             resultsContainer.classList.remove('hidden');
             
             document.querySelectorAll('.download-btn').forEach(button => {
@@ -214,25 +198,41 @@
             });
         }
 
-        function handleDownloadClick(event) {
+        async function handleDownloadClick(event) {
             const button = event.currentTarget;
             const videoId = button.dataset.videoid;
             const videoTitle = button.dataset.videotitle;
 
-            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Starting...';
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Getting link...';
             button.disabled = true;
 
-            const downloadUrl = `${BACKEND_URL_BASE}/download-mp3?videoId=${videoId}&title=${encodeURIComponent(videoTitle)}`;
-            
-            // We now directly navigate to the download URL.
-            window.location.href = downloadUrl;
+            try {
+                const apiUrl = `${BACKEND_URL_BASE}/download-mp3?videoId=${videoId}`;
+                const response = await fetch(apiUrl);
+                const result = await response.json();
 
-            // Since the page navigates, we don't know for sure when the download finishes.
-            // We'll reset the button after a delay, assuming the download has started.
-            setTimeout(() => {
-                button.innerHTML = '<i class="fa-solid fa-download mr-2"></i>MP3';
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+
+                // Create a temporary link to trigger the download from the direct URL
+                const a = document.createElement('a');
+                a.href = result.downloadUrl;
+                // Browsers may add a .mp4 extension, but the file is m4a audio.
+                // We'll name it .m4a for clarity.
+                a.download = `${videoTitle}.m4a`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                button.innerHTML = '<i class="fa-solid fa-check mr-2"></i>Done!';
+
+            } catch (error) {
+                console.error('Download Error:', error);
+                showModal('Download Error', error.message);
+                button.innerHTML = '<i class="fa-solid fa-download mr-2"></i>Audio';
                 button.disabled = false;
-            }, 4000);
+            }
         }
 
         function createVideoItemHTML(video) {
@@ -246,13 +246,11 @@
                     </div>
                     <button data-videoid="${video.id}" data-videotitle="${sanitizedTitle}" class="download-btn flex-shrink-0 px-4 py-2 font-semibold rounded-lg btn-gradient transition-all duration-300 transform hover:scale-105">
                         <i class="fa-solid fa-download mr-2"></i>
-                        MP3
+                        Audio (m4a)
                     </button>
                 </div>
             `;
         }
-
-        // --- UI Utility Functions ---
 
         function setLoading(isLoading) {
             if (isLoading) {

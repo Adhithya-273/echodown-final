@@ -1,10 +1,5 @@
-// File: /api/download-mp3.js (Final Corrected Version)
+// File: /api/download-mp3.js (Proxy Method)
 const play = require('play-dl');
-const ffmpeg = require('fluent-ffmpeg');
-const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
-
-// Point fluent-ffmpeg to the bundled binary
-ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 // Function to apply user cookies to play-dl
 const setAuth = async () => {
@@ -39,48 +34,38 @@ module.exports = async (req, res) => {
     try {
         await setAuth();
 
-        const { videoId, title } = req.query;
+        const { videoId } = req.query;
 
-        // Rigorous check for videoId
         if (!videoId || typeof videoId !== 'string' || videoId === 'undefined') {
-            console.error(`Invalid videoId received: ${videoId}`);
             return res.status(400).json({ success: false, error: 'Invalid or missing video ID.' });
         }
 
-        const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
-        console.log(`Attempting to stream directly from URL: ${videoUrl}`);
         
-        // Reverting to the more direct stream method.
-        const stream = await play.stream(videoUrl, {
-            discordPlayerCompatibility: true
+        // Fetch all video info
+        const videoInfo = await play.video_info(videoUrl);
+
+        // Find the best audio-only format (m4a is common and high quality)
+        const bestAudio = videoInfo.format.find(f => f.mime_type.startsWith('audio/mp4'));
+
+        if (!bestAudio) {
+            throw new Error('No suitable audio-only format found for this video.');
+        }
+
+        // The job of this function is now to simply return the direct download URL
+        return res.status(200).json({
+            success: true,
+            downloadUrl: bestAudio.url
         });
 
-        res.setHeader('Content-Disposition', `attachment; filename="${cleanTitle}.mp3"`);
-        res.setHeader('Content-Type', 'audio/mpeg');
-
-        ffmpeg(stream.stream)
-            .audioBitrate(128)
-            .toFormat('mp3')
-            .on('error', (err) => {
-                console.error('FFmpeg error:', err.message);
-                if (!res.headersSent) {
-                    res.status(500).send(`FFmpeg error: ${err.message}`);
-                }
-            })
-            .pipe(res, { end: true });
-
     } catch (error) {
-        console.error('--- DETAILED DOWNLOAD ERROR ---');
+        console.error('--- DETAILED LINK FINDER ERROR ---');
         console.error(error);
         console.error('--- END DETAILED ERROR ---');
         
-        if (!res.headersSent) {
-            res.status(500).json({ 
-                success: false, 
-                error: `Failed to process download. The video may be unavailable or blocked. Please check the server logs for details.` 
-            });
-        }
+        res.status(500).json({ 
+            success: false, 
+            error: `Failed to get download link: ${error.message}` 
+        });
     }
 };
