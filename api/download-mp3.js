@@ -1,4 +1,4 @@
-// File: /api/download-mp3.js (Using play-dl for reliability)
+// File: /api/download-mp3.js (Final Corrected Version)
 const play = require('play-dl');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
@@ -18,12 +18,6 @@ const setAuth = async () => {
                 },
             });
             console.log('Successfully attempted to set YouTube authentication token.');
-            
-            const validation = await play.is_token_valid();
-            console.log(`play-dl token validation result: ${JSON.stringify(validation)}`);
-            if (!validation.youtube) {
-                 console.warn("Warning: play-dl reports the provided YouTube cookie is not valid. Please provide a fresh one.");
-            }
         } catch (e) {
             console.error('Error setting YouTube token:', e.message);
         }
@@ -54,7 +48,7 @@ module.exports = async (req, res) => {
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        // Final attempt with the most direct streaming method
+        // Use the direct streaming method which is more robust
         const stream = await play.stream(videoUrl, {
             discordPlayerCompatibility: true
         });
@@ -74,7 +68,6 @@ module.exports = async (req, res) => {
             .pipe(res, { end: true });
 
     } catch (error) {
-        // Log the detailed error from the library before sending a generic response
         console.error('--- DETAILED DOWNLOAD ERROR ---');
         console.error(error);
         console.error('--- END DETAILED ERROR ---');
@@ -87,4 +80,3 @@ module.exports = async (req, res) => {
         }
     }
 };
-
