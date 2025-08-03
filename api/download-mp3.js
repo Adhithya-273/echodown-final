@@ -9,9 +9,9 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 // Function to apply user cookies to play-dl
 const setAuth = async () => {
     const cookie = process.env.YOUTUBE_COOKIES;
-    if (cookie) {
+    // Extra-safe check: ensure cookie exists and is a string
+    if (cookie && typeof cookie === 'string') {
         try {
-            // Sanitize the cookie string to remove invalid characters
             const sanitizedCookie = cookie.replace(/[^\x20-\x7E]/g, '');
             await play.setToken({
                 youtube: {
@@ -20,7 +20,6 @@ const setAuth = async () => {
             });
             console.log('Successfully attempted to set YouTube authentication token.');
             
-            // Let's check if the token is considered valid by the library
             const validation = await play.is_token_valid();
             console.log(`play-dl token validation result: ${JSON.stringify(validation)}`);
             if (!validation.youtube) {
@@ -30,7 +29,7 @@ const setAuth = async () => {
             console.error('Error setting YouTube token:', e.message);
         }
     } else {
-        console.warn('Warning: YOUTUBE_COOKIES environment variable not found. Downloads may fail.');
+        console.warn('Warning: YOUTUBE_COOKIES environment variable not found or is not a string.');
     }
 };
 
@@ -45,7 +44,6 @@ module.exports = async (req, res) => {
     }
 
     try {
-        // Set authentication cookies before processing the request
         await setAuth();
 
         const { videoId, title } = req.query;
@@ -56,21 +54,24 @@ module.exports = async (req, res) => {
 
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
 
-        // Use play-dl to get the audio stream directly from the video ID
-        const stream = await play.stream_from_info({
-            video_details: {
-                id: videoId,
-                url: `https://www.youtube.com/watch?v=${videoId}`
-            }
-        }, {
-            discordPlayerCompatibility: true // A setting for better compatibility
-        });
+        let stream;
+        try {
+            // First, fetch the video info to ensure it's valid and accessible
+            const videoInfo = await play.video_info(`https://www.youtube.com/watch?v=${videoId}`);
+            
+            // Then, create the stream from the fetched info object
+            stream = await play.stream_from_info(videoInfo, {
+                discordPlayerCompatibility: true // A setting for better compatibility
+            });
 
-        // Set response headers to trigger a download in the browser
+        } catch (streamError) {
+            console.error("Error getting stream from play-dl:", streamError.message);
+            throw new Error("Could not fetch video stream. The video might be region-locked or require a different cookie.");
+        }
+
         res.setHeader('Content-Disposition', `attachment; filename="${cleanTitle}.mp3"`);
         res.setHeader('Content-Type', 'audio/mpeg');
 
-        // Use ffmpeg to convert the stream to MP3 and pipe it to the response
         ffmpeg(stream.stream)
             .audioBitrate(128)
             .toFormat('mp3')
