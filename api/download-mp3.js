@@ -1,4 +1,4 @@
-// File: /api/download-mp3.js (Proxy Method)
+// File: /api/download-mp3.js (Final Corrected Version)
 const play = require('play-dl');
 
 // Function to apply user cookies to play-dl
@@ -45,11 +45,11 @@ module.exports = async (req, res) => {
         // Fetch all video info
         const videoInfo = await play.video_info(videoUrl);
 
-        // Find the best audio-only format (m4a is common and high quality)
-        const bestAudio = videoInfo.format.find(f => f.mime_type.startsWith('audio/mp4'));
+        // Find the best audio-only format, ensuring mime_type exists before checking it.
+        const bestAudio = videoInfo.format.find(f => f.mime_type && f.mime_type.startsWith('audio/mp4'));
 
         if (!bestAudio) {
-            throw new Error('No suitable audio-only format found for this video.');
+            throw new Error('No suitable M4A audio-only format found for this video.');
         }
 
         // The job of this function is now to simply return the direct download URL
