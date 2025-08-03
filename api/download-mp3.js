@@ -9,7 +9,6 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 // Function to apply user cookies to play-dl
 const setAuth = async () => {
     const cookie = process.env.YOUTUBE_COOKIES;
-    // Extra-safe check: ensure cookie exists and is a string
     if (cookie && typeof cookie === 'string') {
         try {
             const sanitizedCookie = cookie.replace(/[^\x20-\x7E]/g, '');
@@ -53,21 +52,12 @@ module.exports = async (req, res) => {
         }
 
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        let stream;
-        try {
-            // First, fetch the video info to ensure it's valid and accessible
-            const videoInfo = await play.video_info(`https://www.youtube.com/watch?v=${videoId}`);
-            
-            // Then, create the stream from the fetched info object
-            stream = await play.stream_from_info(videoInfo, {
-                discordPlayerCompatibility: true // A setting for better compatibility
-            });
-
-        } catch (streamError) {
-            console.error("Error getting stream from play-dl:", streamError.message);
-            throw new Error("Could not fetch video stream. The video might be region-locked or require a different cookie.");
-        }
+        // Final attempt with the most direct streaming method
+        const stream = await play.stream(videoUrl, {
+            discordPlayerCompatibility: true
+        });
 
         res.setHeader('Content-Disposition', `attachment; filename="${cleanTitle}.mp3"`);
         res.setHeader('Content-Type', 'audio/mpeg');
@@ -84,9 +74,17 @@ module.exports = async (req, res) => {
             .pipe(res, { end: true });
 
     } catch (error) {
-        console.error('Download process error:', error.message);
+        // Log the detailed error from the library before sending a generic response
+        console.error('--- DETAILED DOWNLOAD ERROR ---');
+        console.error(error);
+        console.error('--- END DETAILED ERROR ---');
+        
         if (!res.headersSent) {
-            res.status(500).json({ success: false, error: `Failed to start download: ${error.message}` });
+            res.status(500).json({ 
+                success: false, 
+                error: `Failed to process download. The video may be unavailable or blocked. Please check the server logs for details.` 
+            });
         }
     }
 };
+
