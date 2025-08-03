@@ -54,11 +54,15 @@ module.exports = async (req, res) => {
             return res.status(400).json({ success: false, error: 'Missing video ID.' });
         }
 
-        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
 
-        // Use play-dl to get the audio stream
-        const stream = await play.stream(videoUrl, {
+        // Use play-dl to get the audio stream directly from the video ID
+        const stream = await play.stream_from_info({
+            video_details: {
+                id: videoId,
+                url: `https://www.youtube.com/watch?v=${videoId}`
+            }
+        }, {
             discordPlayerCompatibility: true // A setting for better compatibility
         });
 
