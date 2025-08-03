@@ -42,8 +42,12 @@ module.exports = async (req, res) => {
 
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         
-        // Fetch all video info
-        const videoInfo = await play.video_info(videoUrl);
+        // Fetch video info using the more resilient 'yt-dlp' extractor
+        const videoInfo = await play.video_info(videoUrl, {
+            source: {
+                youtube: 'yt-dlp'
+            }
+        });
 
         // Find the best audio-only format, ensuring mime_type exists before checking it.
         const bestAudio = videoInfo.format.find(f => f.mime_type && f.mime_type.startsWith('audio/mp4'));
