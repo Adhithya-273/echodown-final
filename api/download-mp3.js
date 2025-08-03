@@ -6,6 +6,20 @@ const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 // Point fluent-ffmpeg to the bundled binary
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
+// Function to apply user cookies to play-dl
+const setAuth = async () => {
+    if (process.env.YOUTUBE_COOKIES) {
+        await play.userconfig({
+            youtube: {
+                cookie: process.env.YOUTUBE_COOKIES,
+            },
+        });
+        console.log('YouTube cookies have been set.');
+    } else {
+        console.log('No YouTube cookies found in environment variables.');
+    }
+};
+
 module.exports = async (req, res) => {
     // Standard CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,6 +31,9 @@ module.exports = async (req, res) => {
     }
 
     try {
+        // Set authentication cookies before processing the request
+        await setAuth();
+
         const { videoId, title } = req.query;
 
         if (!videoId) {
