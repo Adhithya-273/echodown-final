@@ -9,12 +9,13 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 // Function to apply user cookies to play-dl
 const setAuth = async () => {
     if (process.env.YOUTUBE_COOKIES) {
-        await play.userconfig({
+        // Corrected function: use play.setToken() instead of play.userconfig()
+        await play.setToken({
             youtube: {
                 cookie: process.env.YOUTUBE_COOKIES,
             },
         });
-        console.log('YouTube cookies have been set.');
+        console.log('YouTube cookies have been set using play.setToken().');
     } else {
         console.log('No YouTube cookies found in environment variables.');
     }
