@@ -1,14 +1,13 @@
-// File: /api/download-mp3.js
-const ytdl = require('ytdl-core');
+// File: /api/download-mp3.js (Using play-dl for reliability)
+const play = require('play-dl');
 const ffmpeg = require('fluent-ffmpeg');
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
 
-// Point fluent-ffmpeg to the bundled binary, making it more reliable
+// Point fluent-ffmpeg to the bundled binary
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
-// This is the Vercel Serverless Function
 module.exports = async (req, res) => {
-    // Allow requests from any origin
+    // Standard CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -27,24 +26,21 @@ module.exports = async (req, res) => {
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
 
+        // Use play-dl to get the audio stream
+        const stream = await play.stream(videoUrl, {
+            discordPlayerCompatibility: true // A setting for better compatibility
+        });
+
         // Set response headers to trigger a download in the browser
         res.setHeader('Content-Disposition', `attachment; filename="${cleanTitle}.mp3"`);
         res.setHeader('Content-Type', 'audio/mpeg');
 
-        // Get the audio-only stream from ytdl
-        const audioStream = ytdl(videoUrl, {
-            quality: 'highestaudio',
-            filter: 'audioonly',
-        });
-        
-        // IMPORTANT: Vercel has a timeout. If ffmpeg takes too long, this will fail.
-        // This is best for short videos.
-        ffmpeg(audioStream)
+        // Use ffmpeg to convert the stream to MP3 and pipe it to the response
+        ffmpeg(stream.stream)
             .audioBitrate(128)
             .toFormat('mp3')
             .on('error', (err) => {
                 console.error('FFmpeg error:', err.message);
-                // We can't send a JSON error if headers are already sent, so just end the stream.
                 if (!res.headersSent) {
                     res.status(500).send(`FFmpeg error: ${err.message}`);
                 }
@@ -54,7 +50,7 @@ module.exports = async (req, res) => {
     } catch (error) {
         console.error('Download process error:', error.message);
         if (!res.headersSent) {
-            res.status(500).json({ success: false, error: 'Failed to start download process.' });
+            res.status(500).json({ success: false, error: `Failed to start download: ${error.message}` });
         }
     }
 };
