@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EchoDown - YouTube to MP3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+        }
+        .glass-effect {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-gradient {
+            background-image: linear-gradient(to right, #3b82f6, #8b5cf6);
+        }
+        .btn-gradient:hover {
+            background-image: linear-gradient(to right, #2563eb, #7c3aed);
+        }
+        .btn-gradient:disabled {
+            background-image: linear-gradient(to right, #374151, #4b5563);
+            cursor: not-allowed;
+            transform: none;
+        }
+        #videoList::-webkit-scrollbar {
+            width: 8px;
+        }
+        #videoList::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+        #videoList::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 10px;
+        }
+        #videoList::-webkit-scrollbar-thumb:hover {
+            background: #2563eb;
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.2);
+            border-left-color: #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0px, 0px) scale(1); }
+        }
+        .animate-blob {
+            animation: blob 7s infinite;
+        }
+        .animation-delay-2000 { animation-delay: 2s; }
+        .animation-delay-4000 { animation-delay: 4s; }
+    </style>
+</head>
+<body class="text-white">
+
+    <div class="min-h-screen flex flex-col items-center justify-center p-4 bg-grid-white/[0.05] relative overflow-hidden">
+        <!-- Background decorative blobs -->
+        <div class="absolute top-0 left-0 w-72 h-72 bg-blue-500 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob"></div>
+        <div class="absolute top-0 right-0 w-72 h-72 bg-purple-500 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob animation-delay-2000"></div>
+        <div class="absolute bottom-20 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-screen filter blur-3xl opacity-20 animate-blob animation-delay-4000"></div>
+
+        <div class="w-full max-w-2xl z-10">
+            <header class="text-center mb-8">
+                <h1 class="text-4xl md:text-5xl font-bold mb-2 flex items-center justify-center gap-3">
+                    <i class="fa-solid fa-rocket text-blue-400"></i>
+                    EchoDown
+                </h1>
+                <p class="text-slate-400 text-lg">Paste a YouTube video or playlist URL to get started.</p>
+            </header>
+
+            <main>
+                <div class="mb-6">
+                    <div class="relative">
+                        <i class="fa-solid fa-link absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input type="text" id="youtubeUrl" placeholder="https://www.youtube.com/watch?v=..." class="w-full pl-12 pr-4 py-4 rounded-xl glass-effect focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300">
+                    </div>
+                </div>
+
+                <div class="text-center mb-8">
+                    <button id="fetchBtn" class="w-full md:w-auto px-10 py-4 font-bold rounded-xl btn-gradient transition-all duration-300 transform hover:scale-105">
+                        <i class="fa-solid fa-magnifying-glass mr-2"></i>
+                        Fetch Video(s)
+                    </button>
+                </div>
+
+                <div id="loader" class="hidden justify-center items-center my-8">
+                    <div class="loader"></div>
+                </div>
+
+                <div id="resultsContainer" class="hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold">Results</h2>
+                        <button id="downloadAllBtn" class="px-4 py-2 font-semibold rounded-lg bg-green-600 hover:bg-green-700 transition-colors duration-300 hidden">
+                            <i class="fa-solid fa-file-zipper mr-2"></i>
+                            Download All (Coming Soon)
+                        </button>
+                    </div>
+                    <div id="videoList" class="max-h-[40vh] overflow-y-auto space-y-3 pr-2">
+                        <!-- Video items will be injected here by JavaScript -->
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Modal for errors and messages -->
+        <div id="messageModal" class="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50">
+            <div class="bg-slate-800 rounded-2xl p-8 max-w-md w-full shadow-2xl border border-slate-700 transform transition-all duration-300 scale-95 opacity-0">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 id="modalTitle" class="text-2xl font-bold text-red-400">Error</h3>
+                    <button id="closeModalBtn" class="text-slate-400 hover:text-white text-3xl leading-none">&times;</button>
+                </div>
+                <p id="modalMessage" class="text-slate-300 mb-4">An unexpected error occurred.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- Configuration ---
+        // Vercel hosts the backend in the /api folder relative to the frontend.
+        // No need to change this URL.
+        const BACKEND_URL_BASE = '/api';
+
+        // --- Element References ---
+        const youtubeUrlInput = document.getElementById('youtubeUrl');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const loader = document.getElementById('loader');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const videoList = document.getElementById('videoList');
+        const downloadAllBtn = document.getElementById('downloadAllBtn');
+        
+        // Modal elements
+        const messageModal = document.getElementById('messageModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalMessage = document.getElementById('modalMessage');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const modalContent = messageModal.querySelector('div');
+
+        // --- Event Listeners ---
+        fetchBtn.addEventListener('click', handleFetchClick);
+        closeModalBtn.addEventListener('click', closeModal);
+        messageModal.addEventListener('click', (e) => {
+            if (e.target === messageModal) closeModal();
+        });
+        downloadAllBtn.disabled = true;
+
+        // --- Core Functions ---
+
+        async function handleFetchClick() {
+            const url = youtubeUrlInput.value.trim();
+            if (!url) {
+                showModal('Input Required', 'Please enter a YouTube URL first.', 'yellow');
+                return;
+            }
+
+            setLoading(true);
+            resultsContainer.classList.add('hidden');
+            videoList.innerHTML = '';
+
+            try {
+                const apiUrl = `${BACKEND_URL_BASE}/fetch-info?url=${encodeURIComponent(url)}`;
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    const errorResult = await response.json();
+                    throw new Error(errorResult.error || `Server responded with status ${response.status}`);
+                }
+
+                const result = await response.json();
+
+                if (!result.success) {
+                    throw new Error(result.error || 'Could not fetch video info.');
+                }
+                
+                displayResults(result.data);
+
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                showModal('Fetch Error', error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        function displayResults(data) {
+            if (data.type === 'playlist') {
+                data.videos.forEach(video => {
+                    videoList.innerHTML += createVideoItemHTML(video);
+                });
+                downloadAllBtn.classList.remove('hidden');
+            } else {
+                videoList.innerHTML += createVideoItemHTML(data);
+                downloadAllBtn.classList.add('hidden');
+            }
+            resultsContainer.classList.remove('hidden');
+            
+            document.querySelectorAll('.download-btn').forEach(button => {
+                button.addEventListener('click', handleDownloadClick);
+            });
+        }
+
+        function handleDownloadClick(event) {
+            const button = event.currentTarget;
+            const videoId = button.dataset.videoid;
+            const videoTitle = button.dataset.videotitle;
+
+            button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i>Starting...';
+            button.disabled = true;
+
+            const downloadUrl = `${BACKEND_URL_BASE}/download-mp3?videoId=${videoId}&title=${encodeURIComponent(videoTitle)}`;
+            
+            // We now directly navigate to the download URL.
+            window.location.href = downloadUrl;
+
+            // Since the page navigates, we don't know for sure when the download finishes.
+            // We'll reset the button after a delay, assuming the download has started.
+            setTimeout(() => {
+                button.innerHTML = '<i class="fa-solid fa-download mr-2"></i>MP3';
+                button.disabled = false;
+            }, 4000);
+        }
+
+        function createVideoItemHTML(video) {
+            const sanitizedTitle = video.title.replace(/"/g, '&quot;');
+            return `
+                <div class="glass-effect p-4 rounded-lg flex items-center gap-4 transition-all duration-300 hover:border-blue-500/50">
+                    <img src="${video.thumbnail}" alt="Video thumbnail" class="w-28 h-16 object-cover rounded-md" onerror="this.onerror=null;this.src='https://placehold.co/112x64/0f172a/ffffff?text=Error';">
+                    <div class="flex-grow min-w-0">
+                        <h4 class="font-semibold leading-tight truncate" title="${sanitizedTitle}">${video.title}</h4>
+                        <p class="text-sm text-slate-400">${video.duration}</p>
+                    </div>
+                    <button data-videoid="${video.id}" data-videotitle="${sanitizedTitle}" class="download-btn flex-shrink-0 px-4 py-2 font-semibold rounded-lg btn-gradient transition-all duration-300 transform hover:scale-105">
+                        <i class="fa-solid fa-download mr-2"></i>
+                        MP3
+                    </button>
+                </div>
+            `;
+        }
+
+        // --- UI Utility Functions ---
+
+        function setLoading(isLoading) {
+            if (isLoading) {
+                loader.classList.remove('hidden');
+                loader.classList.add('flex');
+                fetchBtn.disabled = true;
+            } else {
+                loader.classList.add('hidden');
+                loader.classList.remove('flex');
+                fetchBtn.disabled = false;
+            }
+        }
+
+        function showModal(title, message, color = 'red') {
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+            modalTitle.className = `text-2xl font-bold text-${color}-400`;
+            
+            messageModal.classList.remove('hidden');
+            setTimeout(() => {
+                modalContent.classList.remove('scale-95', 'opacity-0');
+            }, 10);
+        }
+
+        function closeModal() {
+            modalContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                messageModal.classList.add('hidden');
+            }, 300);
+        }
+    </script>
+</body>
+</html>

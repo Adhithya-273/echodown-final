@@ -1,0 +1,10 @@
+{
+  "name": "echodown-final",
+  "version": "1.0.0",
+  "description": "YouTube to MP3 converter for Vercel",
+  "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
+    "fluent-ffmpeg": "^2.1.2",
+    "ytdl-core": "^4.11.5"
+  }
+}
