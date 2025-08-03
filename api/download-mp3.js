@@ -8,19 +8,29 @@ ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 // Function to apply user cookies to play-dl
 const setAuth = async () => {
-    if (process.env.YOUTUBE_COOKIES) {
-        // Sanitize the cookie string to remove invalid characters
-        const sanitizedCookie = process.env.YOUTUBE_COOKIES.replace(/[^\x20-\x7E]/g, '');
-
-        // Corrected function: use play.setToken() instead of play.userconfig()
-        await play.setToken({
-            youtube: {
-                cookie: sanitizedCookie,
-            },
-        });
-        console.log('YouTube cookies have been sanitized and set using play.setToken().');
+    const cookie = process.env.YOUTUBE_COOKIES;
+    if (cookie) {
+        try {
+            // Sanitize the cookie string to remove invalid characters
+            const sanitizedCookie = cookie.replace(/[^\x20-\x7E]/g, '');
+            await play.setToken({
+                youtube: {
+                    cookie: sanitizedCookie,
+                },
+            });
+            console.log('Successfully attempted to set YouTube authentication token.');
+            
+            // Let's check if the token is considered valid by the library
+            const validation = await play.is_token_valid();
+            console.log(`play-dl token validation result: ${JSON.stringify(validation)}`);
+            if (!validation.youtube) {
+                 console.warn("Warning: play-dl reports the provided YouTube cookie is not valid. Please provide a fresh one.");
+            }
+        } catch (e) {
+            console.error('Error setting YouTube token:', e.message);
+        }
     } else {
-        console.log('No YouTube cookies found in environment variables.');
+        console.warn('Warning: YOUTUBE_COOKIES environment variable not found. Downloads may fail.');
     }
 };
 
