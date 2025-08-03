@@ -50,10 +50,14 @@ module.exports = async (req, res) => {
         const cleanTitle = (title || 'audio').replace(/[<>:"/\\|?*]+/g, '_');
         const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-        console.log(`Attempting to stream from URL: ${videoUrl}`);
+        console.log(`Fetching info for video: ${videoUrl}`);
+        
+        // New, more stable method: First fetch info, then stream from the info object.
+        const videoInfo = await play.video_info(videoUrl);
+        
+        console.log(`Successfully fetched info for "${videoInfo.video_details.title}". Creating stream.`);
 
-        // Use the direct streaming method which is more robust
-        const stream = await play.stream(videoUrl, {
+        const stream = await play.stream_from_info(videoInfo, {
             discordPlayerCompatibility: true
         });
 
